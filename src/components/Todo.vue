@@ -1,19 +1,31 @@
 <script setup>
-import { ref } from 'vue';
+import { ref , onMounted } from 'vue';
+import axios from 'axios'
 
 
-const task = ref(['read', 'play', 'watch']);
+const task = ref([]);
 const newTask = ref('');
 const editTask = ref('');
 const editingIndex = ref(null);
 const isModalOpen = ref(false);
 
 
+onMounted (async ()=>{
+    const response = await axios.get("http://localhost:8000/tasks")
+    console.log(response.data)
+    task.value=response.data
+})
 
-const handleSubmit = () => {
+
+const handleSubmit = async () => {
   if (newTask.value.trim() !== '') {
-    task.value.push(newTask.value);
-    newTask.value = '';
+    try {
+      const response = await axios.post("http://localhost:8000/tasks", { title: newTask.value });
+      task.value.push(response.data);
+      newTask.value = '';
+    } catch (error) {
+      console.error("Error adding task:", error);
+    }
   }
 };
 
@@ -23,17 +35,28 @@ const handleEdit = (taskToEdit, index) => {
   isModalOpen.value = true;
 };
 
-const handleUpdate = () => {
+const handleUpdate = async () => {
   if (editTask.value.trim() !== '') {
-    task.value[editingIndex.value] = editTask.value;
-    isModalOpen.value = false;
-    editingIndex.value = null;
-    editTask.value = '';
+    try {
+      const updatedTask = { ...task.value[editingIndex.value], title: editTask.value };
+      await axios.put(`http://localhost:8000/tasks/${updatedTask.id}`, updatedTask);
+      task.value[editingIndex.value] = updatedTask;
+      isModalOpen.value = false;
+      editingIndex.value = null;
+      editTask.value = '';
+    } catch (error) {
+      console.error("Error updating task:", error);
+    }
   }
 };
 
-const handleDelete = (t) => {
-  task.value = task.value.filter(taskItem => taskItem !== t);
+const handleDelete = async (t) => {
+  try {
+    await axios.delete(`http://localhost:8000/tasks/${t.id}`);
+    task.value = task.value.filter(taskItem => taskItem.id !== t.id);
+  } catch (error) {
+    console.error("Error deleting task:", error);
+  }
 };
 </script>
 
@@ -47,15 +70,14 @@ const handleDelete = (t) => {
 
       <ul class="list-none p-0">
         <li v-for="(t, index) in task" :key="index" class="mb-2 flex items-center justify-between p-2  rounded hover:bg-gray-200">
-          <span>{{ t }}</span>
+          <span>{{ t.title }}</span>
           <div class="space-x-2">
             <button @click="handleDelete(t)" class="bg-red-500 text-white p-1 rounded hover:bg-red-600">Delete</button>
-            <button @click="handleEdit(t, index)" class="bg-green-500 text-white p-1 rounded hover:bg-green-600">Edit</button>
+            <button @click="handleEdit(t.title, index)" class="bg-green-500 text-white p-1 rounded hover:bg-green-600">Edit</button>
           </div>
         </li>
       </ul>
 
-      <h1 class="text-xl mb-4 text-center">{{ status }}</h1>
 
       <div v-if="isModalOpen" class="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 flex justify-center items-center">
         <div class="bg-white p-6 rounded-lg shadow-lg w-1/3">
